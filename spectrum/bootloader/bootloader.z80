@@ -1,0 +1,116 @@
+;
+; Title:        Z80 PIO bootloader for Mike Webb's Assembler
+; Author:       Dean Belfield
+; Started:      23/10/2024
+; Last Updated: 23/10/2024
+;
+; Modinfo:
+;               
+                DEVICE  ZXSPECTRUM48
+ 
+CODE_START:     EQU     0xF800
+                 
+                ORG     CODE_START 
+ 
+PORTA_D:        EQU     0x1F            ; Port A data register
+PORTA_C:        EQU     0x5F            ; Port A control register
+PORTB_D:        EQU     0x3F            ; Port B data register
+PORTB_C:        EQU     0x7F            ; Port B control register
+ 
+PIO_MODE3:      EQU     0b11001111      ; Control word for setting a port to Mode 3
+ 
+RDY:            EQU     1
+STB:            EQU     2
+ 
+MAIN:           LD      A, PIO_MODE3    ; Port B is data
+                OUT     (PORTB_C), A
+                LD      A, 0b11111111   ; All pins to input
+                OUT     (PORTB_C), A
+ 
+                LD      A, PIO_MODE3    ; Port A is handshaking
+                OUT     (PORTA_C), A
+                LD      A, 0b00000001   ; PA0 = Ready (input), PA1 = Strobe (output)
+                OUT     (PORTA_C), A
+ 
+                LD      A, 6            ; Set the border colour to yellow (waiting)
+                OUT     (254), A 
+;
+; First wait for three consecutive one bytes
+;
+                LD      B, 3            ; The loop counter
+LOOP_1:         CALL    READB           ; Read a byte from the PIO
+                DEC     D               ; Quick check for one 
+                JR      NZ, ERROR_1     ; If it is not one then error 
+                DJNZ    LOOP_1          ; Loop
+;
+; Now check for a single zero byte
+;               
+                CALL    READB           ; Read a byte from the PIO
+                LD      A, D 
+                OR      A               ; Is it zero?
+                JR      NZ, ERROR_1     ; No, so error
+;
+; Read in the start address and stack for later
+;
+                CALL    READB           ; Read word into HL (little-endian)
+                LD      L, D 
+                CALL    READB 
+                LD      H, D 
+                PUSH    HL              ; Stack for later
+;
+; Read in the length
+;
+                CALL    READB           ; Read word into BC (little-endian)
+                LD      C, D
+                CALL    READB 
+                LD      B, D
+;
+; Copy the data into memory
+;
+LOOP_2:         CALL    READB           ; Read byte from the PIO
+                LD      A, D 
+                OUT     (254), A        ; Flash the border during transfer
+                LD      (HL), A         ; Store byte in memory
+                INC     HL              ; Increment the write address 
+                DEC     BC              ; Decrement the length 
+                LD      A, B            ; Is BC = 0?
+                OR      C
+                JR      NZ, LOOP_2      ; No, so keep on looping
+;
+; Pop the start address off the stack and return to BASIC
+;
+                POP     BC
+                LD      A, 4            ; Set the border colour to green (OK)
+                OUT     (254), A 
+                RET
+ 
+; Error during transfer
+;
+ERROR_1:        LD      A, 2            ; Set the border colour to red (error)
+                OUT     (254), A 
+                RET 
+ 
+; Read a byte in from the parallel port 
+; Returns
+; - D: The data byte
+;
+READB:          IN      A, (PORTA_D)    ; Read the handshaking port
+                RRCA                    ; Rotate bit 0 into the carry
+                JR      NC, READB       ; If it is zero (NC), then keep waiting
+                IN      A, (PORTB_D)    ; Read the data byte in
+                LD      D, A            ; Store in D
+                XOR     A               ; Set A to 0
+                OUT     (PORTA_D), A    ; Strobe line (bit 1) low
+                LD      A, STB          ; Set A to 2
+                OUT     (PORTA_D), A    ; Strobe line (bit 1) high
+                RET
+ 
+CODE_LENGTH:    EQU     $-CODE_START+1
+ 
+                DISPLAY "Code Org: ",/A,CODE_START
+                DISPLAY "Code Length: ",/A,CODE_LENGTH
+ 
+                EMPTYTAP "bootloader.tap"
+                SAVETAP  "bootloader.tap", CODE, "bootload", CODE_START, CODE_LENGTH
+ 
+                END
