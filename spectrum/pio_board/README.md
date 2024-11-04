@@ -16,7 +16,7 @@ The Fritzing file can be found [in this folder](./fritzing/).
 | IC2, IC3      | HEF4050B                   | Hex non-inverting buffer 
 | J1            | 54-pin edge connector 0.1" | Spectrum edge connector
 | J2            | 16-pin IDC connector       |
-| LED3 to LED12 | 8                          | 
+| LED3 to LED12 |                            | 
 | C1            | 100nF                      | Decoupling capacitor for PIO
 | R1            | 10kΩ resistor              | Pull-up for interrupt line
 | R4 to R13     | 220kΩ resistor             | Current-limiting resistors for LEDs
