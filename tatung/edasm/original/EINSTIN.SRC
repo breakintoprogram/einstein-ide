@@ -1,0 +1,92 @@
+;*************************************
+;*                                   *
+;*   gets data from parallel port    *
+;*   of a cpc.                       *
+;*   connections:                    *
+;*     line 16 to (CLOCK)            *
+;*     line 14 to (DATA)             *
+;*     line 13 to (GROUND)           *
+;*                                   *
+;*************************************
+;filename = EINSTIN
+
+;assemble this into einstein
+;goto MOS
+;type G6000
+;type G6000 again because it doesn't
+;work the first time
+
+;graph key will abort
+
+ORG 06000H
+LOAD 06000H
+
+;*************************************
+
+LENGTH:EQU 03FFFH  ;HOW BIG
+START:EQU 8000H   ;WHERE TO PUT
+
+;*************************************
+
+PIODATA:EQU 32H
+PIOCNT:EQU 33H
+
+DI
+CALL INITPIO
+
+LD HL,START
+LD DE,LENGTH-1
+GETBLOCK:IN A,(20H)
+AND 20H
+CALL Z,38H
+CALL GETBYTE
+LD (HL),A
+INC HL
+DEC DE
+LD A,D
+OR E
+JR NZ,GETBLOCK
+EI
+RST 38H
+
+GETBYTE:PUSH BC
+LD B,8
+
+GETBIT:IN A,(20H) ;TEST BRK
+AND 20H
+CALL Z,38H
+
+IN A,(PIODATA);WAIT 'TIL 7
+RLA ;           SET
+JR NC,GETBIT
+
+RLA
+RL C
+
+GETBIT1:IN A,(20H) ;TEST BRK
+AND 20H
+CALL Z,38H
+
+IN A,(PIODATA);WAIT 'TIL 7
+RLA ;           UNSET
+JR C,GETBIT1
+DJNZ GETBIT
+
+LD A,C
+POP BC
+RET
+
+INITPIO:
+XOR A
+OUT (PIODATA),A
+LD A,0CFH      ;BIT MODE
+OUT (PIOCNT),A
+LD A,11111111B ;ALL INPUT
+OUT (PIOCNT),A
+LD A,3         ;NO IRQ
+OUT (PIOCNT),A
+XOR A
+OUT (PIODATA),A
+RET
+
+END:END
