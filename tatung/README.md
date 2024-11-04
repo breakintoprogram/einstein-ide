@@ -107,3 +107,7 @@ Loop length times {
   Store at the address and increment it by one
 }
 ```
+
+## The source code
+
+The source code for Mike's editor/assembler can be [found here](./edasm/README.md).
